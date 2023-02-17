@@ -18,12 +18,12 @@ public class Client {
         try{
             stdIn  = new BufferedReader(new InputStreamReader(System.in)); //takes input from terminal
                 
-            System.out.println("Enter username:\n");
+            System.out.println("Enter username:");
 
             String username = "";
             username = stdIn.readLine();
 
-            System.out.println("Registering to send\n");
+            //System.out.println("Registering to send\n");
 
             clientSendSocket = new Socket(address,sendPort);
 
@@ -31,11 +31,25 @@ public class Client {
             output_send = new DataOutputStream(clientSendSocket.getOutputStream()); //sends output to socket
 
             output_send.writeUTF(username);
+            
 
+            
 
-            System.out.println("Registered to send\n");
+            String res_send = input_send.readUTF();
 
-            System.out.println("Registering to recv\n");
+            if(res_send.equals("NAK")){
+                System.out.println("Username might be invalid or has been already used\n");
+                input_send.close();
+                output_send.close();
+                clientSendSocket.close();
+            }
+            else{
+                //System.out.println("Registered to send\n");
+            }
+            
+            
+
+            //System.out.println("Registering to recv\n");
 
             clientRecvSocket = new Socket(address,recvPort);
 
@@ -44,7 +58,20 @@ public class Client {
 
             output_recv.writeUTF(username);
 
-            System.out.println("Registered to recv\n");
+            String res_recv = input_recv.readUTF();
+
+            if(res_recv.equals("NAK")){
+                System.out.println("Username might be invalid or has been already used\n");
+                input_recv.close();
+                output_recv.close();
+                clientRecvSocket.close();
+                return;
+            }
+            else{
+                //System.out.println("Registered to recv\n");
+            }
+
+            System.out.println("Welcome to Chat room");
 
             Thread serverThreadSend = new Thread(new ServerHandler(clientSendSocket,stdIn,0,input_send,output_send));
             Thread serverThreadRecv = new Thread(new ServerHandler(clientRecvSocket,stdIn,1,input_recv,output_recv));
@@ -100,39 +127,29 @@ public class Client {
         }
         
         private void recvSocketHandler(){
-
-            
+            try{
+                String inputLine;
+                while(true){
+                    while ((inputLine = input.readUTF()) != null) {
+                        System.out.println(inputLine);
+                    }
+                }
+            }
+            catch (IOException i) {
+                System.out.println(i);
+                return;
+            }
 
         }
         
         public void run(){
             try{
                 if(op==1){
-                    try{
-                        String inputLine;
-                        while(true){
-                            while ((inputLine = input.readUTF()) != null) {
-                                System.out.println(inputLine);
-                            }
-                        }
-
-
-                    }
-
-                    catch (IOException i) {
-                        System.out.println(i);
-                        return;
-                    }
-                    
+                    recvSocketHandler();
                 }
                 else{
-                    while(true){
-                        sendSocketHandler();
-                    }
+                    sendSocketHandler();   
                 }
-                
-                    
-                
             }
 
             finally {

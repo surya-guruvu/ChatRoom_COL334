@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
+import java.util.regex.*;
 
 public class Server{
     private Socket          sendSocket   = null;
@@ -29,16 +30,19 @@ public class Server{
 
             while(true){
                 sendSocket = serverSend.accept();
-                recvSocket = serverRecv.accept();
 
-
-                ClientHandler ClientHandlerSend = new ClientHandler(sendSocket,0,stdIn);
-                ClientHandler ClientHandlerRecv = new ClientHandler(recvSocket,1,stdIn);
+                ClientHandler ClientHandlerSend = new ClientHandler(sendSocket,0,stdIn,mapSend);
 
                 Thread clientThreadSend = new Thread(ClientHandlerSend);
-                Thread clientThreadRecv = new Thread(ClientHandlerRecv);
 
                 clientThreadSend.start();
+
+                recvSocket = serverRecv.accept();
+
+                ClientHandler ClientHandlerRecv = new ClientHandler(recvSocket,1,stdIn,mapRecv);
+
+                Thread clientThreadRecv = new Thread(ClientHandlerRecv);
+
                 clientThreadRecv.start();
             }
         }
@@ -54,26 +58,45 @@ public class Server{
         private BufferedReader stdIn       = null;
         private int op                     = 0;
         private String arr[]               = {"send","recv"};
+        private HashMap<String,ClientHandler> mp     = null; 
 
-        public ClientHandler(Socket socket,int op,BufferedReader stdIn) {
+        public ClientHandler(Socket socket,int op,BufferedReader stdIn,HashMap<String,ClientHandler> mp) {
             this.clientSocket = socket;
             this.op           = op;
             this.stdIn        = stdIn;
+            this.mp          = mp;
         }
+
+        public boolean isUsernameWellFormed(String username) {
+            String pattern = "^[a-zA-Z0-9]+$";
+            Pattern regex = Pattern.compile(pattern);
+            Matcher matcher = regex.matcher(username);
+            return matcher.matches();
+        }
+
 
         public void run() {
             try {
-
-                System.out.println("Registering to "+arr[op]);
+                //System.out.println("Registering to "+arr[op]);
 
                 in  = new DataInputStream(clientSocket.getInputStream());
                 out = new DataOutputStream(clientSocket.getOutputStream());
 
                 String username = in.readUTF();
 
-                System.out.println("Username: "+username);
+                //System.out.println("Username: "+username);
 
-                System.out.println("Registered to "+arr[op]);
+                if((!isUsernameWellFormed(username)) || mp.containsKey(username)){
+                    out.writeUTF("NAK");
+                    //in.close();
+                    //out.close();
+                    //clientSocket.close();                    
+                }
+
+                else{
+                    out.writeUTF("ACK");
+                    mp.put(username,this);
+                }
 
                 if(op==0){
                     String inputLine;
@@ -92,16 +115,17 @@ public class Server{
                     }
                 }
 
-
-
-            } catch (IOException e) {
+            } 
+            catch (IOException e) {
                 e.printStackTrace();
-            } finally {
+            } 
+            finally {
                 try {
                     in.close();
                     out.close();
                     clientSocket.close();
-                } catch (IOException e) {
+                } 
+                catch (IOException e) {
                     e.printStackTrace();
                 }
             }
