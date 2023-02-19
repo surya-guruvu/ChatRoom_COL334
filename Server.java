@@ -24,11 +24,10 @@ public class Server{
 
             System.out.println("Server Started");
 
-            System.out.println("Waiting for a Client .....");
-
             stdIn  = new BufferedReader(new InputStreamReader(System.in));
 
             while(true){
+                //Registration starts
                 sendSocket = serverSend.accept();
 
                 ClientHandler ClientHandlerSend = new ClientHandler(sendSocket,0,stdIn,mapSend);
@@ -44,6 +43,7 @@ public class Server{
                 Thread clientThreadRecv = new Thread(ClientHandlerRecv);
 
                 clientThreadRecv.start();
+                //Registration ends
             }
         }
         catch(IOException i)
@@ -65,7 +65,7 @@ public class Server{
             this.clientSocket = socket;
             this.op           = op;
             this.stdIn        = stdIn;
-            this.mp          = mp;
+            this.mp           = mp;
         }
 
         public boolean isUsernameWellFormed(String username) {
@@ -115,7 +115,14 @@ public class Server{
                     }
                 }
                 catch (IOException e) {
-                    System.out.println(e);
+                    try{
+                        System.out.println(e);
+                        cur.out.writeUTF(e + "\n" + rec_name +"\n\n");
+                    }
+                    catch (IOException a) {
+                        System.out.println(a);
+                        return;
+                    }
                     return;
                 }
             }
@@ -151,6 +158,7 @@ public class Server{
 
                 username = in.readUTF();
 
+                //if username is not well formed or username exists
                 if((!isUsernameWellFormed(username)) || mp.containsKey(username)){
                     out.writeUTF("NAK");
                     in.close();

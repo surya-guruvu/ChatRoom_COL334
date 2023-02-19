@@ -21,6 +21,8 @@ public class Client {
     public Client(String address,int sendPort,int recvPort){
         try{
             stdIn  = new BufferedReader(new InputStreamReader(System.in)); //takes input from terminal
+
+            //Registration starts
                 
             System.out.print("Enter username:");
 
@@ -59,6 +61,8 @@ public class Client {
                 clientRecvSocket.close();
                 return;
             }
+
+            //Registration ends
 
             System.out.println("Welcome to Chat room\n");
 
@@ -155,7 +159,6 @@ public class Client {
                 try{
                     if(contentLength==0 || data.length()!=contentLength){
                         String err = "ERROR 103 Header incomplete\n" + "\n";
-                        //out.writeUTF(err);
                         sendObj.output.writeUTF(err);
                         return;
                     }
@@ -170,18 +173,20 @@ public class Client {
                     return;
                 }
             }
+            else{
+                if(lines[0].equals("java.net.SocketException: Connection reset by peer"))
+                System.out.println(lines[1] + " has left");
+            }
         }
         private void sendSocketHandler(){
             
             //string to read the message from stdIn
             String userInput = "";
             try{
-                while(true){
-                    while((userInput = stdIn.readLine())!=null){
-                        // output.writeUTF(userInput);
-                        messageSendParser(userInput);
-                    }
+                while((userInput = stdIn.readLine())!=null){
+                    messageSendParser(userInput);
                 }
+                
 
             }
             catch (IOException i) {
@@ -195,11 +200,9 @@ public class Client {
         private void recvSocketHandler(){
             try{
                 String inputLine;
-                while(true){
-                    while ((inputLine = input.readUTF()) != null) {
-                        // System.out.println(inputLine);
-                        messageRecvParser(inputLine);
-                    }
+                while ((inputLine = input.readUTF()) != null) {
+                    messageRecvParser(inputLine);
+                    
                 }
             }
             catch (IOException i) {
@@ -211,6 +214,8 @@ public class Client {
         
         public void run(){
             try{
+                // on recv thread only recv works. on send thread only send works
+                // To avoid concurrency issues
                 if(op==1){
                     recvSocketHandler();
                 }
