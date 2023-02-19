@@ -10,8 +10,8 @@ public class Server{
     private ServerSocket    serverRecv   = null;
     private BufferedReader  stdIn        = null;
 
-    HashMap<String,ClientHandler> mapSend = null;
-    HashMap<String,ClientHandler> mapRecv = null;
+    public static HashMap<String,ClientHandler> mapSend = null;
+    public static HashMap<String,ClientHandler> mapRecv = null;
 
     public Server(int sendPort,int recvPort){
         try{
@@ -59,6 +59,7 @@ public class Server{
         private int op                     = 0;
         private String arr[]               = {"send","recv"};
         private HashMap<String,ClientHandler> mp     = null; 
+        private String username            = null;
 
         public ClientHandler(Socket socket,int op,BufferedReader stdIn,HashMap<String,ClientHandler> mp) {
             this.clientSocket = socket;
@@ -74,23 +75,87 @@ public class Server{
             return matcher.matches();
         }
 
+        private void messageParser(String clientMsg){
+            String[] parts = clientMsg.split("\n\n");
+            String header = parts[0];
+            String[] lines = header.split("\n");
+            String type = lines[0].substring(0,4);
+
+            //Msg to be forwared to the specified client
+            if(type.equals("SEND")){
+                String rec_name = lines[0].substring(5);
+                int contentLength = Integer.parseInt(lines[1].substring(16));
+
+                String data = "";
+
+                if(contentLength!=0){
+                    data = parts[1];
+                }
+
+                ClientHandler cur  = mapRecv.get(username); //current user recv socket
+                ClientHandler temp = mapRecv.get(rec_name); //recipient user recv socket
+
+                String head = "FORWARD " + username + "\n";
+                head += "Content-length: " + contentLength + "\n";
+                String fullMessage = head + "\n" + data;
+
+                try{
+                    if(!mapRecv.containsKey(rec_name)){
+                        String err = "ERROR 102 Unable to send\n" + "\n";
+                        cur.out.writeUTF(err);
+                        return;
+                    }
+                    else if(contentLength==0 || data.length()!=contentLength){
+                        String err = "ERROR 103 Header incomplete\n" + "\n";
+                        cur.out.writeUTF(err);
+                        return;
+                    }
+                    else{
+                        temp.out.writeUTF(fullMessage);
+                    }
+                }
+                catch (IOException e) {
+                    System.out.println(e);
+                    return;
+                }
+            }
+
+            //If msg is received by the client, then SENT msg is to be sent to the sender
+
+            if(type.equals("RECE")){
+                String rec_name = lines[0].substring(9);
+                ClientHandler cur  = mapRecv.get(username); //current user recv socket
+                ClientHandler temp = mapRecv.get(rec_name); //recipient user recv socket
+                String fullMessage = "SENT " + username + "\n\n";
+
+                try{
+                    temp.out.writeUTF(fullMessage);
+                }
+                catch (IOException e) {
+                    System.out.println(e);
+                    return;
+                }
+            }
+
+            if(type.equals("ERRO")){
+                System.out.println(lines[0]);
+            }
+
+        }
+
 
         public void run() {
             try {
-                //System.out.println("Registering to "+arr[op]);
-
                 in  = new DataInputStream(clientSocket.getInputStream());
                 out = new DataOutputStream(clientSocket.getOutputStream());
 
-                String username = in.readUTF();
-
-                //System.out.println("Username: "+username);
+                username = in.readUTF();
 
                 if((!isUsernameWellFormed(username)) || mp.containsKey(username)){
                     out.writeUTF("NAK");
-                    //in.close();
-                    //out.close();
-                    //clientSocket.close();                    
+                    in.close();
+                    out.close();
+                    clientSocket.close();                    
                 }
 
                 else{
@@ -99,11 +164,9 @@ public class Server{
                 }
 
                 if(op==0){
-                    String inputLine;
-                    while(true){
-                        while ((inputLine = in.readUTF()) != null) {
-                            System.out.println(inputLine);
-                        }
+                    String inputLine;        
+                    while ((inputLine = in.readUTF()) != null) {
+                        messageParser(inputLine);
                     }
                 }
                 else{

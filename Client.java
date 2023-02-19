@@ -12,18 +12,20 @@ public class Client {
     private DataInputStream   input_recv        = null;
     private DataOutputStream  output_recv       = null;
     private BufferedReader    stdIn             = null;
+    private static String     username          = null;
+
+    public static ServerHandler sendObj = null;
+    public static ServerHandler recvObj = null;
 
 
     public Client(String address,int sendPort,int recvPort){
         try{
             stdIn  = new BufferedReader(new InputStreamReader(System.in)); //takes input from terminal
                 
-            System.out.println("Enter username:");
+            System.out.print("Enter username:");
 
-            String username = "";
+            //String username = "";
             username = stdIn.readLine();
-
-            //System.out.println("Registering to send\n");
 
             clientSendSocket = new Socket(address,sendPort);
 
@@ -31,9 +33,6 @@ public class Client {
             output_send = new DataOutputStream(clientSendSocket.getOutputStream()); //sends output to socket
 
             output_send.writeUTF(username);
-            
-
-            
 
             String res_send = input_send.readUTF();
 
@@ -43,13 +42,6 @@ public class Client {
                 output_send.close();
                 clientSendSocket.close();
             }
-            else{
-                //System.out.println("Registered to send\n");
-            }
-            
-            
-
-            //System.out.println("Registering to recv\n");
 
             clientRecvSocket = new Socket(address,recvPort);
 
@@ -67,14 +59,14 @@ public class Client {
                 clientRecvSocket.close();
                 return;
             }
-            else{
-                //System.out.println("Registered to recv\n");
-            }
 
-            System.out.println("Welcome to Chat room");
+            System.out.println("Welcome to Chat room\n");
 
-            Thread serverThreadSend = new Thread(new ServerHandler(clientSendSocket,stdIn,0,input_send,output_send));
-            Thread serverThreadRecv = new Thread(new ServerHandler(clientRecvSocket,stdIn,1,input_recv,output_recv));
+            sendObj = new ServerHandler(clientSendSocket,stdIn,0,input_send,output_send);
+            recvObj = new ServerHandler(clientRecvSocket,stdIn,1,input_recv,output_recv);
+
+            Thread serverThreadSend = new Thread(sendObj);
+            Thread serverThreadRecv = new Thread(recvObj);
 
             serverThreadSend.start();
             serverThreadRecv.start();
@@ -99,12 +91,85 @@ public class Client {
         int op                                  = 1; //0 for send, 1 for recv
         String arr[]                            = {"send","recv"};
 
+
         public ServerHandler(Socket socket,BufferedReader stdIn,int op,DataInputStream input,DataOutputStream output){
             this.clientSocket = socket;
             this.stdIn        = stdIn; 
             this.op           = op;  
             this.input        = input;
             this.output       = output;
+        }
+        private void messageSendParser(String userInput){
+            String rec_name = "";
+            String msg      = "";
+
+            int sz = userInput.length();
+
+            int i = 1;
+            for(;i<sz;i++){
+                if(userInput.charAt(i)==' '){
+                    break;
+                }
+                char a = userInput.charAt(i);
+                rec_name+=a;
+            }
+            i++;
+
+            for(;i<sz;i++){
+                char a = userInput.charAt(i);
+                msg+=a;
+            }
+
+            // Constructing the header section with the Content-length field and msg
+            String header = "SEND " + rec_name + "\n";
+            header += "Content-length: " + msg.length() + "\n";
+            String fullMessage = header + "\n" + msg;
+
+            try{
+                output.writeUTF(fullMessage);
+            }catch (IOException e) {
+                System.out.println(e);
+                return;
+            }
+        }
+        private void messageRecvParser(String serverMsg){
+            String[] parts = serverMsg.split("\n\n");
+            String header = parts[0];
+            String[] lines = header.split("\n");
+            String type = lines[0].substring(0,4);
+
+            if(type.equals("SENT")){
+                System.out.println("SENT to " + lines[0].substring(5) + "\n");
+            }
+            else if(type.equals("ERRO")){
+                System.out.println(lines[0]);
+            }
+            else if(type.equals("FORW")){
+                String sender = lines[0].substring(8);
+                int contentLength = Integer.parseInt(lines[1].substring(16));
+                String data = "";
+
+                if(contentLength!=0){
+                    data = parts[1];
+                }
+                try{
+                    if(contentLength==0 || data.length()!=contentLength){
+                        String err = "ERROR 103 Header incomplete\n" + "\n";
+                        //out.writeUTF(err);
+                        sendObj.output.writeUTF(err);
+                        return;
+                    }
+                    else{
+                        System.out.println(sender+" : "+data);
+                        String se = "RECEIVED "+sender+"\n\n";
+                        sendObj.output.writeUTF(se);
+                    }
+                }
+                catch (IOException e) {
+                    System.out.println(e);
+                    return;
+                }
+            }
         }
         private void sendSocketHandler(){
             
@@ -113,7 +178,8 @@ public class Client {
             try{
                 while(true){
                     while((userInput = stdIn.readLine())!=null){
-                        output.writeUTF(userInput);
+                        // output.writeUTF(userInput);
+                        messageSendParser(userInput);
                     }
                 }
 
@@ -131,7 +197,8 @@ public class Client {
                 String inputLine;
                 while(true){
                     while ((inputLine = input.readUTF()) != null) {
-                        System.out.println(inputLine);
+                        // System.out.println(inputLine);
+                        messageRecvParser(inputLine);
                     }
                 }
             }
