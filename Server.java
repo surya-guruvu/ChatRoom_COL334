@@ -93,37 +93,70 @@ public class Server{
                 }
 
                 ClientHandler cur  = mapRecv.get(username); //current user recv socket
-                ClientHandler temp = mapRecv.get(rec_name); //recipient user recv socket
+                
 
                 String head = "FORWARD " + username + "\n";
                 head += "Content-length: " + contentLength + "\n";
                 String fullMessage = head + "\n" + data;
 
-                try{
-                    if(!mapRecv.containsKey(rec_name)){
-                        String err = "ERROR 102 Unable to send\n" + "\n";
-                        cur.out.writeUTF(err);
-                        return;
-                    }
-                    else if(contentLength==0 || data.length()!=contentLength){
-                        String err = "ERROR 103 Header incomplete\n" + "\n";
-                        cur.out.writeUTF(err);
-                        return;
-                    }
-                    else{
-                        temp.out.writeUTF(fullMessage);
+                if(rec_name.equals("ALL")){
+                    for(Map.Entry<String,ClientHandler> entry : mapRecv.entrySet()){
+                        if(!(entry.getKey().equals(username))){
+                            ClientHandler temp = entry.getValue();
+
+                            try{
+                                if(contentLength==0 || data.length()!=contentLength){
+                                    String err = "ERROR 103 Header incomplete\n" + "\n";
+                                    cur.out.writeUTF(err);
+                                    return;
+                                }
+                                else{
+                                    temp.out.writeUTF(fullMessage);
+                                }
+                            }
+                            catch (IOException e) {
+                                try{
+                                    System.out.println(e);
+                                    cur.out.writeUTF(e + "\n" + entry.getKey() +"\n\n");
+                                }
+                                catch (IOException a) {
+                                    System.out.println(a);
+                                    return;
+                                }
+                                return;
+                            }
+                        }
                     }
                 }
-                catch (IOException e) {
+
+                else{
+                    ClientHandler temp = mapRecv.get(rec_name); //recipient user recv socket
                     try{
-                        System.out.println(e);
-                        cur.out.writeUTF(e + "\n" + rec_name +"\n\n");
+                        if(!mapRecv.containsKey(rec_name)){
+                            String err = "ERROR 102 Unable to send\n" + "\n";
+                            cur.out.writeUTF(err);
+                            return;
+                        }
+                        else if(contentLength==0 || data.length()!=contentLength){
+                            String err = "ERROR 103 Header incomplete\n" + "\n";
+                            cur.out.writeUTF(err);
+                            return;
+                        }
+                        else{
+                            temp.out.writeUTF(fullMessage);
+                        }
                     }
-                    catch (IOException a) {
-                        System.out.println(a);
+                    catch (IOException e) {
+                        try{
+                            System.out.println(e);
+                            cur.out.writeUTF(e + "\n" + rec_name +"\n\n");
+                        }
+                        catch (IOException a) {
+                            System.out.println(a);
+                            return;
+                        }
                         return;
                     }
-                    return;
                 }
             }
 
